@@ -149,18 +149,31 @@ function StudentRoom() {
 
       <div className="flex-1 flex gap-4 p-4">
         <div className="flex-1 flex flex-col gap-4">
+          {!currentQuestion && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium">Başlamak için sağdaki sorulardan birini seçin</span>
+              </div>
+            </div>
+          )}
           {currentQuestion && (
             <div className="card flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500">
-              <div>
+              <div className="flex-1">
                 <span className="text-sm text-gray-600">Aktif Soru</span>
                 <h3 className="font-semibold text-lg">{currentQuestion.title}</h3>
+                {currentQuestion.description && (
+                  <p className="text-sm text-gray-700 mt-1">{currentQuestion.description}</p>
+                )}
               </div>
               <button
                 onClick={() => {
                   setCurrentQuestion(null);
                   setStudentCode(getDefaultCode(room?.config?.language || 'python'));
                 }}
-                className="text-sm text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                className="text-sm text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors ml-4"
               >
                 × Kapat
               </button>
@@ -181,24 +194,26 @@ function StudentRoom() {
             </div>
           )}
           
-          <div className="flex-1 card-dark overflow-hidden">
-            <CodeEditor
-              code={studentCode}
-              onChange={setStudentCode}
-              language={room?.config?.language || 'python'}
-              readOnly={false}
-              title="Kod Editörü"
-            />
-          </div>
-          
-          <div className="h-64 card-dark overflow-hidden">
-            <CodeRunner 
-              code={studentCode} 
-              language={room?.config?.language || 'python'}
-              onOutput={handleTerminalOutput}
-              userId={studentName}
-              roomId={roomId}
-            />
+          <div className="flex-1 flex gap-4">
+            <div className="flex-1 card-dark overflow-hidden">
+              <CodeEditor
+                code={studentCode}
+                onChange={setStudentCode}
+                language={room?.config?.language || 'python'}
+                readOnly={false}
+                title="Kod Editörü"
+              />
+            </div>
+            
+            <div className="w-96 card-dark overflow-hidden">
+              <CodeRunner 
+                code={studentCode} 
+                language={room?.config?.language || 'python'}
+                onOutput={handleTerminalOutput}
+                userId={studentName}
+                roomId={roomId}
+              />
+            </div>
           </div>
         </div>
 

@@ -56,15 +56,7 @@ export const useRoomStore = create(devtools((set) => ({
       }
     };
   }),
-  setStudents: (students) => set((state) => {
-    console.log('[STORE] setStudents called with:', students);
-    console.log('[STORE] Current room:', state.room);
-    if (!state.room) {
-      console.log('[STORE] No room exists, cannot set students');
-      return state;
-    }
-    const newState = { room: { ...state.room, students } };
-    console.log('[STORE] New state will be:', newState);
-    return newState;
-  })
+  setStudents: (students) => set((state) => ({
+    room: state.room ? { ...state.room, students } : null
+  }))
 }), { name: 'room-store' }));

@@ -117,25 +117,17 @@ module.exports = (io) => {
     });
 
     socket.on('approve-student', ({ roomId, studentId }) => {
-      console.log(`[APPROVE] Starting approval for student ${studentId} in room ${roomId}`);
       const result = roomService.approveStudent(roomId, studentId);
-      console.log('[APPROVE] Approval result:', result);
-      
       if (result.approved && result.student) {
         const room = roomService.getRoom(roomId);
-        console.log('[APPROVE] Room students after approval:', room.students.map(s => s.id));
-        console.log('[APPROVE] Room students full:', JSON.stringify(room.students, null, 2));
         
         // Notify the approved student
         io.to(result.student.socketId).emit('approval-status', { approved: true });
         io.to(result.student.socketId).emit('room-state', room);
         
         // Send updated student list to all
-        console.log(`[APPROVE] Emitting student-list to room ${roomId}:`, room.students);
         io.to(roomId).emit('student-list', room.students);
         io.to(roomId).emit('user-joined', { userId: studentId, role: 'student' });
-      } else {
-        console.log('[APPROVE] Approval failed');
       }
     });
 

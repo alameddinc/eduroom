@@ -4,6 +4,10 @@ import { useRoomStore } from '../store/roomStore';
 function QuestionCard({ question, isTeacher, studentId, onSelect, isActive, submissions, onTest }) {
   const { room } = useRoomStore();
   
+  // Check if current student passed this question
+  const studentSubmission = submissions[`${studentId}-${question.id}`];
+  const hasStudentPassed = studentSubmission?.answer?.passed;
+  
   const studentStats = useMemo(() => {
     if (!isTeacher || !room?.students) return null;
     
@@ -35,8 +39,9 @@ function QuestionCard({ question, isTeacher, studentId, onSelect, isActive, subm
         ? 'ring-2 ring-primary-500 shadow-glow scale-[1.02]' 
         : 'hover:shadow-xl hover:scale-[1.01]'
       }
-      ${isTeacher ? 'bg-gradient-to-br from-gray-50 to-gray-100' : 'bg-white'}
-      border border-gray-200 hover:border-gray-300
+      ${hasStudentPassed && !isTeacher ? 'bg-gradient-to-br from-green-50 to-green-100' : ''}
+      ${isTeacher ? 'bg-gradient-to-br from-gray-50 to-gray-100' : !hasStudentPassed ? 'bg-white' : ''}
+      border ${hasStudentPassed && !isTeacher ? 'border-green-300' : 'border-gray-200'} hover:border-gray-300
     `}>
       {/* Status bar for teacher */}
       {isTeacher && studentStats && (
@@ -107,7 +112,14 @@ function QuestionCard({ question, isTeacher, studentId, onSelect, isActive, subm
         {/* Actions */}
         {!isTeacher && (
           <div className="flex gap-2">
-            {!isActive ? (
+            {hasStudentPassed ? (
+              <div className="flex-1 bg-green-100 text-green-800 py-2 px-4 rounded-lg font-medium flex items-center justify-center gap-2 border border-green-300">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Başarıyla Tamamlandı
+              </div>
+            ) : !isActive ? (
               <button
                 onClick={() => onSelect(question)}
                 className="flex-1 btn-primary rounded-lg flex items-center justify-center gap-2"

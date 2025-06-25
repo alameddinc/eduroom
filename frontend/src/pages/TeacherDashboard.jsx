@@ -52,9 +52,7 @@ function TeacherDashboard() {
     if (socket) {
       // Setup all listeners first
       socket.on('student-list', (students) => {
-        console.log('[FRONTEND] student-list event received:', students);
         if (students && Array.isArray(students)) {
-          console.log('[FRONTEND] Calling setStudents with:', students);
           setStudents(students);
         }
       });
@@ -168,8 +166,6 @@ function TeacherDashboard() {
   };
 
   const approveStudent = (studentId) => {
-    console.log('[FRONTEND] Approving student:', studentId);
-    console.log('[FRONTEND] Current room:', room);
     if (socket) {
       socket.emit('approve-student', { roomId, studentId });
       
@@ -245,10 +241,6 @@ function TeacherDashboard() {
     }
   };
 
-  console.log('[RENDER] TeacherDashboard - room:', room);
-  console.log('[RENDER] TeacherDashboard - students:', room?.students);
-  console.log('[RENDER] TeacherDashboard - pendingStudents:', pendingStudents);
-  
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
       <header className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4 shadow-lg">
