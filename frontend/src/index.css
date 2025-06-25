@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-inter antialiased;
+  }
+  
+  .font-inter {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply backdrop-blur-lg bg-white/10 border border-white/20;
+  }
+  
+  .glass-dark {
+    @apply backdrop-blur-lg bg-gray-900/80 border border-gray-700/50;
+  }
+  
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 text-white rounded-lg font-medium
+           hover:bg-primary-700 active:bg-primary-800 
+           transition-all duration-200 hover:shadow-glow-sm
+           disabled:bg-gray-400 disabled:cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium
+           hover:bg-gray-300 active:bg-gray-400 
+           transition-all duration-200
+           disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-lg overflow-hidden 
+           border border-gray-200/50 hover:shadow-xl 
+           transition-shadow duration-300;
+  }
+  
+  .card-dark {
+    @apply bg-dark-200 rounded-xl shadow-lg overflow-hidden 
+           border border-gray-700/50 hover:shadow-xl 
+           transition-shadow duration-300;
+  }
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-full hover:bg-gray-500;
+}
+
+.dark ::-webkit-scrollbar-track {
+  @apply bg-dark-300;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 hover:bg-gray-500;
+}
+
+/* Highlight Animation */
+@keyframes highlight-pulse {
+  0%, 100% {
+    background-color: rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    background-color: rgba(251, 191, 36, 0.5);
+  }
+}
+
+.highlight-selection {
+  animation: highlight-pulse 2s ease-in-out infinite;
+  @apply rounded;
+}
