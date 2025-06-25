@@ -66,6 +66,8 @@ function StudentRoom() {
 
       socket.on('new-question', (question) => {
         console.log('New question received:', question);
+        // Force re-render to show new question
+        setRoom(prevRoom => prevRoom ? { ...prevRoom, questions: [...(prevRoom.questions || []), question] } : null);
       });
 
       socket.on('teacher-highlight-received', ({ selection }) => {
@@ -225,7 +227,11 @@ function StudentRoom() {
             studentCode={studentCode}
             onQuestionSelect={(question) => {
               setCurrentQuestion(question);
-              setStudentCode(question.testCode || getDefaultCode(room?.config?.language || 'python'));
+              // If testCode is empty or just whitespace, use default code
+              const code = question.testCode && question.testCode.trim() 
+                ? question.testCode 
+                : getDefaultCode(room?.config?.language || 'python');
+              setStudentCode(code);
             }}
             currentQuestionId={currentQuestion?.id}
           />

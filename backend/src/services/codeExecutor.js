@@ -28,6 +28,12 @@ class CodeExecutor {
     const filePath = path.join(this.tempDir, `${fileId}${config.extension}`);
     
     try {
+      // Ensure code doesn't have only empty lines or incorrect indentation
+      const cleanedCode = code.trim();
+      if (!cleanedCode) {
+        throw new Error('Kod boş olamaz');
+      }
+      
       await fs.writeFile(filePath, code);
       
       const command = config.getCommand(filePath, stdin);

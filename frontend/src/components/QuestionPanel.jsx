@@ -110,6 +110,13 @@ function QuestionPanel({ roomId, isTeacher, studentId, studentCode, onQuestionSe
       };
 
       setSubmissions({ ...submissions, [questionId]: submission });
+      
+      // Also update allSubmissions for QuestionCard
+      const key = `${studentId}-${questionId}`;
+      setAllSubmissions(prev => ({
+        ...prev,
+        [key]: { userId: studentId, questionId, answer: submission }
+      }));
 
       if (!isTeacher && socket) {
         socket.emit('submit-answer', {
@@ -122,18 +129,27 @@ function QuestionPanel({ roomId, isTeacher, studentId, studentCode, onQuestionSe
     } catch (error) {
       console.error('Error running test:', error);
       const errorMsg = error.response?.data?.details || error.response?.data?.error || 'Test çalıştırılamadı';
+      const errorSubmission = {
+        questionId,
+        studentCode,
+        actualOutput: '',
+        expectedOutput: question.expectedOutput,
+        passed: false,
+        error: errorMsg,
+        timestamp: new Date()
+      };
+      
       setSubmissions({ 
         ...submissions, 
-        [questionId]: {
-          questionId,
-          studentCode,
-          actualOutput: '',
-          expectedOutput: question.expectedOutput,
-          passed: false,
-          error: errorMsg,
-          timestamp: new Date()
-        }
+        [questionId]: errorSubmission
       });
+      
+      // Also update allSubmissions for QuestionCard
+      const key = `${studentId}-${questionId}`;
+      setAllSubmissions(prev => ({
+        ...prev,
+        [key]: { userId: studentId, questionId, answer: errorSubmission }
+      }));
     } finally {
       setRunningTests({ ...runningTests, [questionId]: false });
     }
