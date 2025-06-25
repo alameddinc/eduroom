@@ -4,6 +4,7 @@ class RoomService {
   constructor() {
     this.rooms = new Map();
     this.userToRoom = new Map();
+    this.bannedUsers = new Map(); // Map of roomId -> { userId: bannedUntil }
   }
 
   createRoom(teacherId, config) {
@@ -34,6 +35,18 @@ class RoomService {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
+    // Check if user is banned
+    if (role === 'student' && this.isUserBanned(roomId, userId)) {
+      return { banned: true, bannedUntil: this.getBanEndTime(roomId, userId) };
+    }
+
+    // Clean up old socket mapping if exists
+    for (const [oldSocketId, userInfo] of this.userToRoom.entries()) {
+      if (userInfo.userId === userId && userInfo.roomId === roomId && oldSocketId !== socketId) {
+        this.userToRoom.delete(oldSocketId);
+      }
+    }
+    
     this.userToRoom.set(socketId, { roomId, userId });
 
     if (role === 'teacher') {
@@ -125,6 +138,14 @@ class RoomService {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
+    // Check if already pending
+    const existingPending = room.pendingStudents.find(s => s.id === userId);
+    if (existingPending) {
+      // Update socket ID if student reconnected
+      existingPending.socketId = socketId;
+      return room;
+    }
+
     room.pendingStudents.push({
       id: userId,
       socketId,
@@ -185,6 +206,52 @@ class RoomService {
 
   getAllRooms() {
     return Array.from(this.rooms.values());
+  }
+
+  kickStudent(roomId, studentId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
+    // Remove student from room
+    const studentIndex = room.students.findIndex(s => s.id === studentId);
+    if (studentIndex !== -1) {
+      const student = room.students[studentIndex];
+      room.students.splice(studentIndex, 1);
+      
+      // Add to banned list for 60 minutes
+      const bannedUntil = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes from now
+      if (!this.bannedUsers.has(roomId)) {
+        this.bannedUsers.set(roomId, new Map());
+      }
+      this.bannedUsers.get(roomId).set(studentId, bannedUntil);
+      
+      return { kicked: true, student, bannedUntil };
+    }
+    
+    return { kicked: false };
+  }
+
+  isUserBanned(roomId, userId) {
+    const roomBans = this.bannedUsers.get(roomId);
+    if (!roomBans) return false;
+    
+    const bannedUntil = roomBans.get(userId);
+    if (!bannedUntil) return false;
+    
+    // Check if ban has expired
+    if (new Date() > bannedUntil) {
+      roomBans.delete(userId);
+      return false;
+    }
+    
+    return true;
+  }
+
+  getBanEndTime(roomId, userId) {
+    const roomBans = this.bannedUsers.get(roomId);
+    if (!roomBans) return null;
+    
+    return roomBans.get(userId);
   }
 }
 

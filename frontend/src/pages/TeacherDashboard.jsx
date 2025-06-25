@@ -15,7 +15,7 @@ function TeacherDashboard() {
   const navigate = useNavigate();
   const socket = useSocket();
   const { room, setRoom, updateCode, setStudents, pendingStudents, setPendingStudents, addPendingStudent, removePendingStudent } = useRoomStore();
-  const [selectedLanguage, setSelectedLanguage] = useState('python');
+  const [selectedLanguage, setSelectedLanguage] = useState(null);
   const [activeTab, setActiveTab] = useState('questions');
   const [studentTabs, setStudentTabs] = useState([]);
   const [activeStudentTab, setActiveStudentTab] = useState(null);
@@ -138,18 +138,7 @@ function TeacherDashboard() {
     }
   };
 
-  const handleLanguageChange = (language) => {
-    setSelectedLanguage(language);
-    const newCode = getDefaultCode(language);
-    updateCode(newCode);
-    if (socket) {
-      socket.emit('code-change', { 
-        roomId, 
-        code: newCode, 
-        language 
-      });
-    }
-  };
+  // Language is now fixed at room creation - no longer changeable
 
   const openStudentTab = (student) => {
     if (!studentTabs.find(tab => tab.id === student.id)) {
@@ -181,22 +170,39 @@ function TeacherDashboard() {
     }
   };
 
+  const kickStudent = (studentId) => {
+    if (confirm(`${studentId} isimli öğrenciyi odadan atmak istediğinize emin misiniz? Öğrenci 60 dakika boyunca odaya giremeyecek.`)) {
+      if (socket) {
+        socket.emit('kick-student', { roomId, studentId });
+      }
+    }
+  };
+
   const saveQuestionsAsCSV = () => {
     if (room?.questions?.length > 0) {
-      const csvContent = [
-        ['title', 'description', 'testCode', 'expectedOutput'],
+      // Add BOM for UTF-8 Excel compatibility
+      const BOM = '\uFEFF';
+      const csvContent = BOM + [
+        ['Başlık', 'Açıklama', 'Test Kodu', 'Beklenen Çıktı'],
         ...room.questions.map(q => [
           q.title,
           q.description || '',
           q.testCode || '',
           q.expectedOutput || ''
         ])
-      ].map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+      ].map(row => row.map(cell => {
+        // Properly escape CSV values
+        const value = String(cell);
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')).join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `questions-${roomId}.csv`;
+      link.download = `sorular-${roomId}-${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
     }
   };
@@ -207,38 +213,114 @@ function TeacherDashboard() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const text = e.target.result;
-          const lines = text.split('\n');
-          const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+          let text = e.target.result;
+          // Remove BOM if present
+          if (text.charCodeAt(0) === 0xFEFF) {
+            text = text.substr(1);
+          }
+          
+          // Parse CSV with multiline support
+          const parseCSV = (text) => {
+            const rows = [];
+            let current = [];
+            let currentValue = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+              const char = text[i];
+              const nextChar = text[i + 1];
+              
+              if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                  currentValue += '"';
+                  i++; // Skip next quote
+                } else {
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === ',' && !inQuotes) {
+                current.push(currentValue);
+                currentValue = '';
+              } else if (char === '\n' && !inQuotes) {
+                current.push(currentValue);
+                if (current.some(v => v.trim())) { // Skip empty rows
+                  rows.push(current);
+                }
+                current = [];
+                currentValue = '';
+              } else {
+                currentValue += char;
+              }
+            }
+            
+            // Handle last value
+            if (currentValue || current.length > 0) {
+              current.push(currentValue);
+              if (current.some(v => v.trim())) {
+                rows.push(current);
+              }
+            }
+            
+            return rows;
+          };
+          
+          const rows = parseCSV(text);
+          if (rows.length < 2) {
+            throw new Error('CSV dosyası en az başlık ve bir veri satırı içermelidir');
+          }
+          
+          const headers = rows[0];
+          
+          // Map Turkish headers to English if needed
+          const headerMap = {
+            'Başlık': 'title',
+            'Açıklama': 'description', 
+            'Test Kodu': 'testCode',
+            'Beklenen Çıktı': 'expectedOutput',
+            'title': 'title',
+            'description': 'description',
+            'testCode': 'testCode',
+            'expectedOutput': 'expectedOutput'
+          };
           
           const questions = [];
-          for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim()) {
-              const values = lines[i].match(/(".*?"|[^,]+)/g).map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-              const question = {};
-              headers.forEach((header, index) => {
-                question[header] = values[index] || '';
+          for (let i = 1; i < rows.length; i++) {
+            const values = rows[i];
+            const question = {};
+            
+            headers.forEach((header, index) => {
+              const mappedHeader = headerMap[header.trim()] || header.trim();
+              question[mappedHeader] = values[index] ? values[index].trim() : '';
+            });
+            
+            if (question.title && question.title !== 'def main():') {
+              questions.push({
+                id: `q-${Date.now()}-${i}`,
+                title: question.title,
+                description: question.description || '',
+                testCode: question.testCode || '',
+                expectedOutput: question.expectedOutput || '',
+                type: 'code-output',
+                createdAt: new Date()
               });
-              if (question.title) {
-                questions.push({
-                  id: `q-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                  ...question,
-                  createdAt: new Date()
-                });
-              }
             }
           }
           
-          await axios.put(`/api/rooms/${roomId}/questions`, { questions });
-          setRoom({ ...room, questions });
-          alert('Sorular yüklendi!');
+          if (questions.length > 0) {
+            await axios.put(`/api/rooms/${roomId}/questions`, { questions });
+            setRoom({ ...room, questions });
+            alert(`${questions.length} soru başarıyla yüklendi!`);
+          } else {
+            alert('CSV dosyasında geçerli soru bulunamadı!');
+          }
         } catch (error) {
           console.error('Error loading CSV:', error);
-          alert('CSV yükleme hatası!');
+          alert('CSV yükleme hatası: ' + error.message);
         }
       };
-      reader.readAsText(file);
+      reader.readAsText(file, 'UTF-8');
     }
+    // Reset file input
+    event.target.value = '';
   };
 
   return (
@@ -305,15 +387,13 @@ function TeacherDashboard() {
         <div className="flex-1 flex flex-col gap-4">
           <div className="bg-white rounded-lg shadow p-3 flex items-center gap-4">
             <label className="font-medium">Programlama Dili:</label>
-            <select
-              value={selectedLanguage}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-2 rounded border border-gray-300 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="python">Python</option>
-              <option value="go">Go</option>
-              <option value="sql">SQL</option>
-            </select>
+            <div className="px-3 py-2 rounded bg-gray-100 border border-gray-300 text-gray-700 font-medium">
+              {selectedLanguage === 'python' && 'Python'}
+              {selectedLanguage === 'go' && 'Go'}
+              {selectedLanguage === 'sql' && 'SQL'}
+              {selectedLanguage === 'javascript' && 'JavaScript'}
+            </div>
+            <span className="text-sm text-gray-500">(Oda oluşturulurken belirlendi)</span>
           </div>
           <div className="flex-1 flex flex-col gap-4">
             {activeStudentTab ? (
@@ -345,6 +425,7 @@ function TeacherDashboard() {
               onStudentClick={openStudentTab}
               onApprove={approveStudent}
               onReject={rejectStudent}
+              onKick={kickStudent}
             />
           </div>
           <div className="flex-1 bg-white rounded-lg shadow-lg overflow-hidden">

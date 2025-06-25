@@ -21,6 +21,13 @@ function QuestionPanel({ roomId, isTeacher, studentId, studentCode, onQuestionSe
   const { room } = useRoomStore();
 
   useEffect(() => {
+    // Sync questions from room state if available
+    if (room?.questions) {
+      setQuestions(room.questions);
+    }
+  }, [room?.questions]);
+
+  useEffect(() => {
     loadQuestions();
     
     if (socket) {
@@ -57,8 +64,38 @@ function QuestionPanel({ roomId, isTeacher, studentId, studentCode, onQuestionSe
   const loadQuestions = async () => {
     try {
       const response = await axios.get(`/api/rooms/${roomId}`);
-      if (response.data.room && response.data.room.questions) {
-        setQuestions(response.data.room.questions);
+      if (response.data.room) {
+        if (response.data.room.questions) {
+          setQuestions(response.data.room.questions);
+        }
+        
+        // Load submissions from room data
+        if (response.data.room.submissions) {
+          const roomSubmissions = response.data.room.submissions;
+          const formattedSubmissions = {};
+          
+          // Convert server submissions to local format
+          Object.entries(roomSubmissions).forEach(([key, submission]) => {
+            formattedSubmissions[key] = {
+              userId: submission.userId,
+              questionId: submission.questionId,
+              answer: submission.answer
+            };
+          });
+          
+          setAllSubmissions(formattedSubmissions);
+          
+          // If student, extract their submissions
+          if (!isTeacher && studentId) {
+            const studentSubmissions = {};
+            Object.entries(roomSubmissions).forEach(([key, submission]) => {
+              if (submission.userId === studentId) {
+                studentSubmissions[submission.questionId] = submission.answer;
+              }
+            });
+            setSubmissions(studentSubmissions);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading questions:', error);

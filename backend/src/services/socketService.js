@@ -22,20 +22,56 @@ module.exports = (io) => {
       socket.join(roomId);
       const joinedRoom = roomService.joinRoom(roomId, userId, role, socket.id);
       
+      // Check if user is banned
+      if (joinedRoom && joinedRoom.banned) {
+        const minutesLeft = Math.ceil((joinedRoom.bannedUntil - new Date()) / 1000 / 60);
+        socket.emit('banned', { 
+          message: `Odadan atıldınız. ${minutesLeft} dakika sonra tekrar girebilirsiniz.`,
+          bannedUntil: joinedRoom.bannedUntil
+        });
+        return;
+      }
+      
       if (joinedRoom) {
         if (role === 'student' && joinedRoom.config.requireApproval) {
-          // Add to pending students if approval required
-          roomService.addPendingStudent(roomId, userId, socket.id);
-          socket.emit('pending-approval', { message: 'Öğretmen onayı bekleniyor...' });
+          // Check if student is already approved
+          const isAlreadyApproved = joinedRoom.students.some(s => s.id === userId);
           
-          const teacher = joinedRoom.teacher;
-          if (teacher && teacher.socketId) {
-            io.to(teacher.socketId).emit('student-pending', { userId, socketId: socket.id });
+          if (isAlreadyApproved) {
+            // Update student online status and socket ID
+            const student = joinedRoom.students.find(s => s.id === userId);
+            if (student) {
+              student.online = true;
+              student.socketId = socket.id;
+            }
+            
+            // Student is already approved, just send room state
+            socket.emit('room-state', joinedRoom);
+            
+            // Notify all users in room about reconnected student
+            io.to(roomId).emit('user-joined', { userId, role });
+            io.to(roomId).emit('student-list', joinedRoom.students);
+          } else {
+            // Add to pending students if approval required and not already approved
+            roomService.addPendingStudent(roomId, userId, socket.id);
+            socket.emit('pending-approval', { message: 'Öğretmen onayı bekleniyor...' });
+            
+            const teacher = joinedRoom.teacher;
+            if (teacher && teacher.socketId) {
+              io.to(teacher.socketId).emit('student-pending', { userId, socketId: socket.id });
+            }
           }
         } else {
           socket.emit('room-state', joinedRoom);
           
           if (role === 'student') {
+            // Update student online status if reconnecting
+            const student = joinedRoom.students.find(s => s.id === userId);
+            if (student) {
+              student.online = true;
+              student.socketId = socket.id;
+            }
+            
             // Notify all users in room about new student
             io.to(roomId).emit('user-joined', { userId, role });
             
@@ -142,7 +178,47 @@ module.exports = (io) => {
 
     socket.on('create-question', ({ roomId, question }) => {
       const updatedRoom = roomService.addQuestion(roomId, question);
-      io.to(roomId).emit('new-question', question);
+      if (updatedRoom) {
+        // Get the newly added question (last in array)
+        const newQuestion = updatedRoom.questions[updatedRoom.questions.length - 1];
+        io.to(roomId).emit('new-question', newQuestion);
+        
+        // Also emit updated room state to ensure sync
+        io.to(roomId).emit('room-state', updatedRoom);
+      }
+    });
+
+    socket.on('request-student-code', ({ roomId, studentId }) => {
+      const room = roomService.getRoom(roomId);
+      if (room) {
+        const student = room.students.find(s => s.id === studentId);
+        if (student && student.lastCode) {
+          socket.emit('student-live-code', {
+            userId: studentId,
+            code: student.lastCode,
+            questionId: student.currentQuestionId || null
+          });
+        }
+      }
+    });
+
+    socket.on('kick-student', ({ roomId, studentId }) => {
+      const result = roomService.kickStudent(roomId, studentId);
+      if (result && result.kicked && result.student) {
+        const room = roomService.getRoom(roomId);
+        
+        // Notify the kicked student
+        if (result.student.socketId) {
+          io.to(result.student.socketId).emit('kicked', { 
+            message: 'Öğretmen tarafından odadan atıldınız. 60 dakika sonra tekrar girebilirsiniz.',
+            bannedUntil: result.bannedUntil
+          });
+        }
+        
+        // Update student list for all
+        io.to(roomId).emit('student-list', room.students);
+        io.to(roomId).emit('user-left', { userId: studentId });
+      }
     });
 
     socket.on('run-code', ({ roomId, code, language, stdin }) => {
@@ -155,9 +231,8 @@ module.exports = (io) => {
         const room = roomService.getRoom(roomId);
         io.to(roomId).emit('user-left', { userId });
         
-        if (room && room.teacher && room.teacher.socketId) {
-          io.to(room.teacher.socketId).emit('student-list', room.students);
-        }
+        // Send updated student list to all room members
+        io.to(roomId).emit('student-list', room.students);
       }
     });
   });

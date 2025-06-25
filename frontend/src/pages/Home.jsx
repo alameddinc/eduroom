@@ -10,6 +10,7 @@ function Home() {
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [teacherPassword, setTeacherPassword] = useState('');
   const [requireApproval, setRequireApproval] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('python');
 
   const createRoom = async () => {
     if (!teacherPassword) {
@@ -22,8 +23,8 @@ function Home() {
       const response = await axios.post('/api/rooms/create', {
         teacherId: `teacher-${Date.now()}`,
         config: {
-          language: 'python',
-          allowedLanguages: ['python', 'go', 'sql'],
+          language: selectedLanguage,
+          allowedLanguages: [selectedLanguage], // Only allow selected language
           password: teacherPassword,
           requireApproval
         }
@@ -164,6 +165,25 @@ function Home() {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Bu parolayı öğrencilerle paylaşmayın, sadece siz kullanacaksınız
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Programlama Dili
+                </label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none"
+                >
+                  <option value="python">Python</option>
+                  <option value="go">Go</option>
+                  <option value="sql">SQL</option>
+                  <option value="javascript">JavaScript</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Seçtiğiniz dil oda boyunca sabit kalacaktır
                 </p>
               </div>
               

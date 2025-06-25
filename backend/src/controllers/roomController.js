@@ -13,7 +13,14 @@ router.get('/:roomId', (req, res) => {
   if (!room) {
     return res.status(404).json({ success: false, error: 'Room not found' });
   }
-  res.json({ success: true, room });
+  
+  // Convert submissions Map to object for JSON serialization
+  const roomData = {
+    ...room,
+    submissions: room.submissions ? Object.fromEntries(room.submissions) : {}
+  };
+  
+  res.json({ success: true, room: roomData });
 });
 
 router.get('/', (req, res) => {

@@ -8,6 +8,15 @@ function StudentCodeViewer({ student, language, onClose, roomId }) {
   const [questionId, setQuestionId] = useState(null);
   const [terminalOutput, setTerminalOutput] = useState(null);
   const [selection, setSelection] = useState(null);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [comment, setComment] = useState('');
+
+  // Request current student code on mount
+  useEffect(() => {
+    if (socket && student) {
+      socket.emit('request-student-code', { roomId, studentId: student.id });
+    }
+  }, [socket, student, roomId]);
 
   useEffect(() => {
     if (socket) {
@@ -46,11 +55,23 @@ function StudentCodeViewer({ student, language, onClose, roomId }) {
 
   const sendHighlight = () => {
     if (socket && selection) {
+      setShowCommentModal(true);
+    }
+  };
+
+  const confirmHighlight = () => {
+    if (socket && selection) {
       socket.emit('teacher-highlight', {
         roomId,
         studentId: student.id,
-        selection
+        selection: {
+          ...selection,
+          comment: comment
+        }
       });
+      setShowCommentModal(false);
+      setComment('');
+      setSelection(null);
     }
   };
 
@@ -141,6 +162,53 @@ function StudentCodeViewer({ student, language, onClose, roomId }) {
           </div>
         )}
       </div>
+
+      {/* Comment Modal */}
+      {showCommentModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 animate-slide-in">
+            <h3 className="text-xl font-bold mb-4">Yorum Ekle</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-gray-100 p-3 rounded-lg">
+                <span className="text-sm text-gray-600">Seçili kod:</span>
+                <pre className="text-sm font-mono mt-1 whitespace-pre-wrap">{selection?.text}</pre>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Yorumunuz (opsiyonel)
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Öğrenciye gösterilecek açıklama..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCommentModal(false);
+                  setComment('');
+                }}
+                className="flex-1 btn-secondary rounded-xl"
+              >
+                İptal
+              </button>
+              <button
+                onClick={confirmHighlight}
+                className="flex-1 btn-primary rounded-xl"
+              >
+                Gönder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

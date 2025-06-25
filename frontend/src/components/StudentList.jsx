@@ -1,6 +1,6 @@
 import React from 'react';
 
-function StudentList({ students, pendingStudents, onStudentClick, onApprove, onReject }) {
+function StudentList({ students, pendingStudents, onStudentClick, onApprove, onReject, onKick }) {
   const getStudentStatus = (student) => {
     if (!student.online) return { color: 'gray', text: 'Çevrimdışı' };
     if (student.currentQuestionId) return { color: 'blue', text: 'Soru Çözüyor' };
@@ -87,6 +87,20 @@ function StudentList({ students, pendingStudents, onStudentClick, onApprove, onR
                       <span className={`text-xs px-2 py-1 rounded bg-${status.color}-900/30 text-${status.color}-400 border border-${status.color}-800/50`}>
                         {status.text}
                       </span>
+                      {onKick && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onKick(student.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-600/20 rounded"
+                          title="Öğrenciyi At"
+                        >
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                       <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>

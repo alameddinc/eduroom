@@ -18,6 +18,13 @@ function StudentRoom() {
   const [pendingApproval, setPendingApproval] = useState(false);
   const [approvalMessage, setApprovalMessage] = useState('');
   const studentName = localStorage.getItem('studentName') || 'Student';
+  
+  // Save room-student association to handle refresh
+  useEffect(() => {
+    if (roomId && studentName) {
+      localStorage.setItem(`room-${roomId}-student`, studentName);
+    }
+  }, [roomId, studentName]);
 
   useEffect(() => {
     if (socket) {
@@ -52,6 +59,7 @@ function StudentRoom() {
 
       socket.on('room-state', (roomData) => {
         setRoom(roomData);
+        setPendingApproval(false); // Clear pending state if we get room state
         if (!studentCode && roomData?.config?.language) {
           setStudentCode(getDefaultCode(roomData.config.language));
         }
@@ -66,13 +74,37 @@ function StudentRoom() {
 
       socket.on('new-question', (question) => {
         console.log('New question received:', question);
-        // Force re-render to show new question
-        setRoom(prevRoom => prevRoom ? { ...prevRoom, questions: [...(prevRoom.questions || []), question] } : null);
+        // Update room with new question
+        setRoom(prevRoom => {
+          if (!prevRoom) return null;
+          
+          // Check if question already exists
+          const exists = prevRoom.questions?.some(q => q.id === question.id);
+          if (exists) return prevRoom;
+          
+          return {
+            ...prevRoom,
+            questions: [...(prevRoom.questions || []), question]
+          };
+        });
       });
 
       socket.on('teacher-highlight-received', ({ selection }) => {
         setTeacherHighlight(selection);
-        setTimeout(() => setTeacherHighlight(null), 5000);
+        // Clear after 60 seconds instead of 5
+        setTimeout(() => setTeacherHighlight(null), 60000);
+      });
+
+      socket.on('banned', ({ message, bannedUntil }) => {
+        alert(message);
+        localStorage.removeItem(`room-${roomId}-student`);
+        window.location.href = '/';
+      });
+
+      socket.on('kicked', ({ message, bannedUntil }) => {
+        alert(message);
+        localStorage.removeItem(`room-${roomId}-student`);
+        window.location.href = '/';
       });
       
       return () => {
@@ -83,6 +115,8 @@ function StudentRoom() {
         socket.off('code-update');
         socket.off('new-question');
         socket.off('teacher-highlight-received');
+        socket.off('banned');
+        socket.off('kicked');
       };
     }
   }, [socket, roomId, studentName]);
@@ -183,7 +217,16 @@ function StudentRoom() {
           )}
           
           {teacherHighlight && (
-            <div className="card p-3 bg-yellow-50 border-l-4 border-yellow-400 animate-pulse-slow">
+            <div className="card p-3 bg-yellow-50 border-l-4 border-yellow-400 animate-pulse-slow relative">
+              <button
+                onClick={() => setTeacherHighlight(null)}
+                className="absolute top-2 right-2 text-yellow-600 hover:text-yellow-800 p-1"
+                title="Kapat"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
               <div className="flex items-center gap-2 text-yellow-800">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -192,6 +235,12 @@ function StudentRoom() {
               </div>
               {teacherHighlight.text && (
                 <pre className="mt-2 p-2 bg-yellow-100 rounded text-sm font-mono">{teacherHighlight.text}</pre>
+              )}
+              {teacherHighlight.comment && (
+                <div className="mt-2 p-2 bg-yellow-50 rounded">
+                  <span className="text-sm font-medium text-yellow-900">Öğretmen notu:</span>
+                  <p className="text-sm text-yellow-800 mt-1">{teacherHighlight.comment}</p>
+                </div>
               )}
             </div>
           )}
